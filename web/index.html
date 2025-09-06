@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DartsMind Test UI</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:1rem;line-height:1.4}
+    .card{border:1px solid #ddd;border-radius:12px;padding:1rem;margin-bottom:1rem}
+    label{display:block;font-weight:600;margin:.5rem 0 .25rem}
+    input[type="text"], textarea{width:100%;padding:.6rem;border:1px solid #ccc;border-radius:8px}
+    input[type="file"]{margin-top:.25rem}
+    button{padding:.7rem 1rem;border:0;border-radius:8px;background:#111;color:#fff;font-weight:600}
+    .row{display:flex;gap:.5rem;flex-wrap:wrap}
+    .row > *{flex:1 1 200px}
+    pre{white-space:pre-wrap;word-break:break-word;background:#f7f7f7;border-radius:8px;padding:1rem;overflow:auto}
+    small{color:#666}
+  </style>
+</head>
+<body>
+  <h1>🏹 DartsMind — Mini Test UI</h1>
+  <div class="card">
+    <h2>⚙️ Config (ParseExtract)</h2>
+    <form id="cfgForm">
+      <div class="row">
+        <div>
+          <label>ParseExtract URL</label>
+          <input type="text" id="cfg_url" placeholder="https://api.parsextract.com/..." />
+        </div>
+        <div>
+          <label>API Key</label>
+          <input type="text" id="cfg_key" placeholder="Bearer Key (ohne 'Bearer')" />
+        </div>
+      </div>
+      <label>Extra Params (JSON)</label>
+      <textarea id="cfg_extra" rows="3" placeholder='{"ocr_engine":"auto"}'></textarea>
+      <div style="margin-top:.5rem">
+        <label><input type="checkbox" id="cfg_stub"> Stub-Modus aktivieren (Demo ohne API-Call)</label>
+      </div>
+      <div style="margin-top:1rem">
+        <button type="submit">Speichern</button>
+        <small id="cfgStatus"></small>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <form id="uploadForm">
+      <div class="row">
+        <div>
+          <label>Spieler (kommagetrennt, max 7)</label>
+          <input type="text" id="player_names" placeholder="z. B. Alice,Bob" />
+        </div>
+        <div>
+          <label>Bust?</label>
+          <div><input type="checkbox" id="bust" /> <small>als true/false an Backend</small></div>
+        </div>
+      </div>
+      <label>Meta (optional, JSON)</label>
+      <textarea id="meta" rows="3" placeholder='{"matchDate":"2025-09-06","tournament":"Home"}'></textarea>
+      <label>Bild (JPEG/PNG)</label>
+      <input type="file" id="image" accept="image/*" />
+      <div style="margin-top:1rem">
+        <button type="submit">Hochladen &amp; Auswerten</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>➡️ Ergebnis</h2>
+    <pre id="result">Noch kein Upload.</pre>
+  </div>
+
+  <div class="card">
+    <h2>📜 Letzte Ingests</h2>
+    <button id="refresh">Neu laden</button>
+    <pre id="ingests">Lade...</pre>
+  </div>
+
+<script>
+const $ = (s)=>document.querySelector(s);
+function pretty(obj){ try{return JSON.stringify(obj,null,2)}catch(e){return String(obj)} }
+
+async function loadIngests(){
+  try{
+    const r = await fetch('/ingests');
+    const j = await r.json();
+    $('#ingests').textContent = pretty(j);
+  }catch(e){ $('#ingests').textContent = 'Fehler: '+e; }
+}
+
+$('#refresh').addEventListener('click', (e)=>{ e.preventDefault(); loadIngests(); });
+
+document.getElementById('uploadForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const fd = new FormData();
+  const file = $('#image').files[0];
+  if(!file){ alert('Bitte Bild auswählen'); return; }
+  fd.append('image', file);
+  const pn = $('#player_names').value.trim();
+  if(pn) fd.append('player_names', pn);
+  fd.append('bust', $('#bust').checked ? 'true' : 'false');
+  const meta = $('#meta').value.trim();
+  if(meta) fd.append('meta', meta);
+
+  $('#result').textContent = 'Lade...';
+  try{
+    const r = await fetch('/upload', { method:'POST', body: fd });
+    const j = await r.json();
+    $('#result').textContent = pretty(j);
+    loadIngests();
+  }catch(err){
+    $('#result').textContent = 'Fehler: '+err;
+  }
+});
+
+async function loadCfg(){
+  try{
+    const r = await fetch('/config'); const j = await r.json();
+    $('#cfg_url').value = j.parsextract_url || '';
+    $('#cfg_key').value = j.api_key || '';
+    $('#cfg_extra').value = j.extra_params ? JSON.stringify(j.extra_params) : '';
+    $('#cfg_stub').checked = !!j.stub;
+  }catch(e){ $('#cfgStatus').textContent = 'Fehler beim Laden'; }
+}
+document.getElementById('cfgForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  let extra = undefined;
+  try{ extra = $('#cfg_extra').value.trim() ? JSON.parse($('#cfg_extra').value) : undefined; }catch{ extra = undefined; }
+  const body = {
+    parsextract_url: $('#cfg_url').value.trim() || undefined,
+    api_key: $('#cfg_key').value.trim() || undefined,
+    extra_params: extra,
+    stub: $('#cfg_stub').checked
+  };
+  $('#cfgStatus').textContent = 'Speichere...';
+  try{
+    const r = await fetch('/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    const j = await r.json();
+    $('#cfgStatus').textContent = 'Gespeichert ✔︎';
+  }catch(e){ $('#cfgStatus').textContent = 'Fehler: '+e; }
+});
+loadCfg();
+loadIngests();
+</script>
+</body>
+</html>
