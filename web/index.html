@@ -32,8 +32,10 @@
           <input type="text" id="cfg_key" placeholder="Bearer Key (ohne 'Bearer')" />
         </div>
       </div>
+      <label>Extraction Prompt</label>
+      <textarea id="cfg_prompt" rows="3" placeholder="Extract all dart game scores, player names, and round information from this image. Format as JSON."></textarea>
       <label>Extra Params (JSON)</label>
-      <textarea id="cfg_extra" rows="3" placeholder='{"ocr_engine":"auto"}'></textarea>
+      <textarea id="cfg_extra" rows="2" placeholder='{"additional":"params"}'></textarea>
       <div style="margin-top:.5rem">
         <label><input type="checkbox" id="cfg_stub"> Stub-Modus aktivieren (Demo ohne API-Call)</label>
       </div>
@@ -119,6 +121,7 @@ async function loadCfg(){
     const r = await fetch('/config'); const j = await r.json();
     $('#cfg_url').value = j.parsextract_url || '';
     $('#cfg_key').value = j.api_key || '';
+    $('#cfg_prompt').value = j.prompt || '';
     $('#cfg_extra').value = j.extra_params ? JSON.stringify(j.extra_params) : '';
     $('#cfg_stub').checked = !!j.stub;
   }catch(e){ $('#cfgStatus').textContent = 'Fehler beim Laden'; }
@@ -130,6 +133,7 @@ document.getElementById('cfgForm').addEventListener('submit', async (e)=>{
   const body = {
     parsextract_url: $('#cfg_url').value.trim() || undefined,
     api_key: $('#cfg_key').value.trim() || undefined,
+    prompt: $('#cfg_prompt').value.trim() || undefined,
     extra_params: extra,
     stub: $('#cfg_stub').checked
   };
