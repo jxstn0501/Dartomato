@@ -80,7 +80,5 @@ def call_parseextract(image_bytes: bytes, filename: str, mime: str="image/jpeg")
         
     except requests.RequestException as e:
         raise ParseExtractError(f"Network error calling ParseExtract: {e}") from e
-    except requests.HTTPError as e:
-        raise ParseExtractError(f"ParseExtract returned error: {e}") from e
     except Exception as e:
         raise ParseExtractError(f"Error processing ParseExtract response: {e}") from e
