@@ -1,0 +1,20 @@
+### Health
+GET http://localhost:8000/health
+
+### Upload an image (adjust path)
+POST http://localhost:8000/upload
+Content-Type: multipart/form-data
+
+image=@/ABSOLUTE/PATH/TO/row-1-column-1.jpeg
+player_names=Alice,Bob,Charlie
+bust=false
+meta={"matchDate":"2025-09-06","tournament":"Home Practice"}
+
+### List ingests
+GET http://localhost:8000/ingests
+
+### Get one
+GET http://localhost:8000/ingests/1
+
+### Delete one
+DELETE http://localhost:8000/ingests/1
