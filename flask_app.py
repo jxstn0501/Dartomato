@@ -61,7 +61,7 @@ def set_config():
         incoming = request.get_json() or {}
         
         # Update only provided fields
-        for key in ['parsextract_url', 'api_key', 'extra_params', 'stub']:
+        for key in ['parsextract_url', 'api_key', 'prompt', 'extra_params', 'stub']:
             if key in incoming:
                 data[key] = incoming[key]
         

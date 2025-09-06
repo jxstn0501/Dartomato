@@ -5,8 +5,9 @@ from typing import Any, Dict, Optional
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.json"
 
 DEFAULTS = {
-    "parsextract_url": None,
+    "parsextract_url": "https://api.parseextract.com/v1/data-extract",
     "api_key": None,
+    "prompt": "Extract all dart game scores, player names, and round information from this image. Format as JSON with fields: rounds, scores, players.",
     "extra_params": {},   # dict
     "stub": False
 }
