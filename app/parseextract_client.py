@@ -15,12 +15,7 @@ def _bool_env(name: str, default: bool=False) -> bool:
 
 def call_parseextract(image_bytes: bytes, filename: str, mime: str="image/jpeg") -> Dict[str, Any]:
     """
-    Calls the ParseExtract API using the new data-extract endpoint:
-      - PARSEXTRACT_API_KEY: "Bearer ..." value (without 'Bearer ' prefix is also fine)
-      - PARSEXTRACT_URL: full endpoint URL (default: https://api.parseextract.com/v1/data-extract)
-      - PARSEXTRACT_PROMPT: extraction prompt for structured data extraction
-
-    If PARSEXTRACT_STUB=1, returns a demo payload without network.
+    Calls the ParseExtract API using the new data-extract endpoint with clean output processing.
     """
     cfg = load_config()
     if cfg.get("stub") or _bool_env("PARSEXTRACT_STUB", False):
@@ -28,27 +23,35 @@ def call_parseextract(image_bytes: bytes, filename: str, mime: str="image/jpeg")
             "stub": True,
             "engine": "demo",
             "filename": filename,
-            "text": "R1: 60 (441)\nR2: 81 (360)\nR3: 45 (315)",
-            "tokens": [
-                {"round":1,"visit":60,"after":441,"darts":[20,20,20]},
-                {"round":2,"visit":81,"after":360,"darts":[25,26,30]},
-            ]
+            "data": {
+                "rounds": [
+                    {"round": 1, "visit": 60, "after": 441, "darts": [20, 20, 20]},
+                    {"round": 2, "visit": 81, "after": 360, "darts": [25, 26, 30]},
+                    {"round": 3, "visit": 45, "after": 315, "darts": [15, 15, 15]}
+                ],
+                "players": ["Player 1"],
+                "scores": [441, 360, 315]
+            }
         }
-
-    url = cfg.get("parsextract_url") or os.getenv("PARSEXTRACT_URL") or "https://api.parseextract.com/v1/data-extract"
 
     api_key = cfg.get("api_key") or os.getenv("PARSEXTRACT_API_KEY")
     if not api_key:
-        raise ParseExtractError("PARSEXTRACT_API_KEY is not set. Put it in your .env.")
-
-    # Accept both raw key and "Bearer ..." formats
+        raise ParseExtractError("Kein API Key gesetzt.")
+    
     if not api_key.lower().startswith("bearer "):
         api_key = f"Bearer {api_key}"
 
-    # Get extraction prompt for structured data extraction
-    prompt = cfg.get("prompt") or os.getenv("PARSEXTRACT_PROMPT") or "Extract all dart game scores, player names, and round information from this image. Format as JSON with fields: rounds, scores, players."
+    url = cfg.get("parsextract_url") or os.getenv("PARSEXTRACT_URL") or "https://api.parseextract.com/v1/data-extract"
     
-    # Prepare form data
+    # Get extraction prompt with schema
+    prompt = cfg.get("prompt") or os.getenv("PARSEXTRACT_PROMPT") or '''Extract dart game data with this JSON schema:
+{
+  "rounds": [{"round": number, "visit": number, "after": number, "darts": [number, number, number]}],
+  "players": ["player_name"],
+  "scores": [number]
+}'''
+
+    headers = {"Authorization": api_key}
     files = {"file": (filename, image_bytes, mime)}
     data = {"prompt": prompt}
     
@@ -58,18 +61,26 @@ def call_parseextract(image_bytes: bytes, filename: str, mime: str="image/jpeg")
         for k, v in extra_params.items():
             data[k] = v
 
-    headers = {"Authorization": api_key}
-    timeout = (10, 120)  # 10 seconds connect, 120 seconds read
     try:
-        resp = requests.post(url, headers=headers, files=files, data=data, timeout=timeout)
+        resp = requests.post(url, headers=headers, files=files, data=data, timeout=60)
+        resp.raise_for_status()
+        out = resp.json()
+        
+        # ---- Clean Output ----
+        for key in ["output", "text", "data", "result", "extracted_data"]:  # mögliche Felder
+            if key in out and isinstance(out[key], str):
+                try:
+                    parsed = json.loads(out[key])
+                    out[key] = parsed  # ersetzt String durch echtes Objekt
+                except Exception:
+                    # wenn nicht parsebar → nur \n entfernen
+                    out[key] = out[key].replace("\\n", " ").strip()
+        
+        return out
+        
     except requests.RequestException as e:
         raise ParseExtractError(f"Network error calling ParseExtract: {e}") from e
-
-    if resp.status_code >= 400:
-        raise ParseExtractError(f"ParseExtract returned {resp.status_code}: {resp.text[:500]}")
-
-    try:
-        return resp.json()
-    except Exception:
-        # if it's not JSON, return a basic wrapper
-        return {"raw": resp.text}
+    except requests.HTTPError as e:
+        raise ParseExtractError(f"ParseExtract returned error: {e}") from e
+    except Exception as e:
+        raise ParseExtractError(f"Error processing ParseExtract response: {e}") from e
