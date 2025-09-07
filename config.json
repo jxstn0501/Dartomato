@@ -1,7 +1,7 @@
 {
   "parsextract_url": "https://api.parseextract.com/v1/data-extract",
   "api_key": "TjHTQf68b6017f2a1e42312f494130ecOXsT",
-  "prompt": "Name, Runden, Each dart thrown, Score before round, Score after round",
+  "prompt": "Name, Round , Score before round, Each dart thrown, Score of round, Score after round",
   "extra_params": {},
   "stub": false
 }
